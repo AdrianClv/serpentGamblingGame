@@ -1,0 +1,55 @@
+# Bets: (starts at id=10)
+#      id: gambler
+#    id+1: number bet
+#    id+2: bet amount
+
+init:
+	# Number of bets + 1
+	contract.storage[2] = 1
+	
+	# Master (only the master can send transactions to this contract)
+	contract.storage[3] = msg.sender
+	
+	# Max bets
+	contract.storage[4] = 10
+	
+code:
+	if msg.sender != contract.storage[3]
+		return(1)
+	
+	slots = 3
+	
+	# Insert bet info [0, gambler dir, number bet]
+	if msg.data[0] == 0:
+		id = slots * (contract.storage[2] - 1) + 10
+		
+		contract.storage[id] = msg.data[1]
+		contract.storage[id + 1] = msg.data[2]
+		contract.storage[id + 2] = msg.value
+		
+		contract.storage[2] = contract.storage[2] + 1
+
+	# Time expired [1]
+	elif msg.data[0] == 1:
+	
+		# Winner number [1, ..., 10]
+		random = (block.timestamp % contract.storage[4]) +1
+		
+		winner = 0
+		i = 0
+		n = contract.storage[2] -1
+		while i < n:
+			bet = slots*i + 10 # Index
+			if contract.storage[bet + 1] == random:
+				winner = contract.storage[bet]
+			i = i+1
+			
+		if winner != 0:
+			#suicide(winner)
+		else:
+			i = 0
+			n = contract.storage[2] -1
+			while i < n:
+				bet = slots*i + 10
+				send(contract.storage[bet], contract.storage[bet+2])
+				i = i+1
