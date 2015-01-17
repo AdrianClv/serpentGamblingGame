@@ -1,55 +1,97 @@
 # Bets: (starts at id=10)
-#      id: gambler
-#    id+1: number bet
-#    id+2: bet amount
+#          0...10: Contract data
+#           10+id: Bounty for number id. id in {0, ..., maxBets}
+#   10+maxBets+id: Gambler
+# 10+maxBets+id+1: Number bet
+# 10+maxBets+id+2: Bet amount
+
+# TEST
+# 5: random in {1, ..., maxBets}
+# 110+numBets*slots+id...: ether returned
+#
+# Lines with "#test" are optional and can be deleted
 
 init:
-	# Number of bets + 1
-	contract.storage[2] = 1
+	# Bounty
+	contract.storage[1] = 0
+	
+	# Number of bets
+	contract.storage[2] = 0
 	
 	# Master (only the master can send transactions to this contract)
 	contract.storage[3] = msg.sender
 	
-	# Max bets
+	# Number of possible bets (maxBets)
 	contract.storage[4] = 10
 	
 code:
-	if msg.sender != contract.storage[3]
+	if msg.sender != contract.storage[3]:
 		return(1)
 	
 	slots = 3
+	numNums = contract.storage[4]
+	numBets = contract.storage[2]
+	totalBet = contract.storage[1]
 	
-	# Insert bet info [0, gambler dir, number bet]
-	if msg.data[0] == 0:
-		id = slots * (contract.storage[2] - 1) + 10
+	# Insert bet info [0, gambler, number bet]
+	if msg.data[0] == 0:	
+		gambler = msg.data[1]
+		numberBet = msg.data[2]
 		
-		contract.storage[id] = msg.data[1]
-		contract.storage[id + 1] = msg.data[2]
+		if numberBet > numNums:
+			return(1)
+			
+		if numberBet == 0:
+			return(1)
+		
+		# Increase the amount bet for the number numberBet
+		contract.storage[10+numberBet] += msg.value
+		
+		# Store data of the bet
+		id = 10+numNums+slots*numBets+1
+		
+		contract.storage[id] = gambler
+		contract.storage[id + 1] = numberBet
 		contract.storage[id + 2] = msg.value
 		
-		contract.storage[2] = contract.storage[2] + 1
+		contract.storage[1] += msg.value
+		contract.storage[2] += 1
 
-	# Time expired [1]
+	# Time expired 
 	elif msg.data[0] == 1:
 	
-		# Winner number [1, ..., 10]
+		# Winner number
 		random = (block.timestamp % contract.storage[4]) +1
+		contract.storage[5] = random #test
 		
-		winner = 0
+		# Amount bet on the winner number
+		betAmount = contract.storage[10 + random]
+		
 		i = 0
-		n = contract.storage[2] -1
-		while i < n:
-			bet = slots*i + 10 # Index
-			if contract.storage[bet + 1] == random:
-				winner = contract.storage[bet]
-			i = i+1
-			
-		if winner != 0:
-			#suicide(winner)
+		# No winner. Funds are given back
+		if betAmount == 0:
+			while i < numBets:
+				id = 10+numNums+slots*i+1
+				send(contract.storage[id], contract.storage[id+2])
+				
+				contract.storage[110+numBets*slots+id] = contract.storage[id] #test
+				contract.storage[110+numBets*slots+id+1] = contract.storage[id+2] #test
+				
+				i += 1
+				
+				
+		# There is at least 1 winner. Funds are distributed among the winners.
 		else:
-			i = 0
-			n = contract.storage[2] -1
-			while i < n:
-				bet = slots*i + 10
-				send(contract.storage[bet], contract.storage[bet+2])
-				i = i+1
+			while i < numBets:
+				id = 10+numNums+slots*i+1
+				if random == contract.storage[id+1]:
+					userPrize = (contract.storage[id+2] * totalBet ) / betAmount
+					send(contract.storage[id], userPrize)
+					
+					contract.storage[110+numBets*slots+id] = contract.storage[id] #test
+					contract.storage[110+numBets*slots+id+1] = userPrize #test
+				
+				i += 1
+		
+		#suicide(contract.storage[3]) # Uncomment to delete the contract after using it.
+	return(0)
