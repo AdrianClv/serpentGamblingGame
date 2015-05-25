@@ -1,0 +1,33 @@
+# Lotteries: (starts at id=3)
+#      id: creator
+#    id+1: end timestamp
+#    id+2: address to a contract with a list of bets
+
+init:
+	# Number of lotteries + 1
+	contract.storage[2] = 1
+	
+code:
+	# Start a lottery, data [0, time limit]
+	if msg.data[0] == 0:
+		slots = 3
+		id = slots * contract.storage[2]
+		
+		contract.storage[id] = msg.sender # Creator of the lottery
+		contract.storage[id + 1] = block.timestamp + msg.data[1] # End timestamp
+		contract.storage[id + 2] = create("contracts/serpentGamblingGame.se.se") # Create a contract to store the list of bets
+		
+		contract.storage[2] = contract.storage[2] + 1
+
+	# Bet [1, id, numberBet]
+	elif msg.data[0] == 1:
+	
+		# Store bet info
+		betsDB = contract.storage[id + 2]
+		data = [0, msg.sender, msg.data[2]]
+		msg(tx.gas, betsDB, msg.value, data)
+
+		# Expired?
+		if block.timestamp > contract.storage[id + 1]:
+			betsDB = contract.storage[id + 2]
+			call(betsDB, [1])
