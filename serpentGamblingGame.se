@@ -85,7 +85,7 @@ code:
 			while i < numBets:
 				id = 10+numNums+slots*i+1
 				if random == contract.storage[id+1]:
-					userPrize = (contract.storage[id+2] * totalBet ) / betAmount
+					userPrize = ((contract.storage[id+2] * totalBet * 1000) / betAmount) / 1000
 					send(contract.storage[id], userPrize)
 					
 					contract.storage[110+numBets*slots+id] = contract.storage[id] #test
